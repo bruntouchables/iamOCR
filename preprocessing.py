@@ -26,7 +26,6 @@ def mark_point(event, x, y, *_):
     if event == cv.EVENT_LBUTTONDOWN:
         if len(points) < 4:
             points.append((x, y))
-            # cv.rectangle(test_image, (x, y), (x + 3, y + 3), (0, 0, 0))
             if len(points) == 4:
                 # reset mouse callback
                 cv.setMouseCallback('Input', lambda *args: None)
