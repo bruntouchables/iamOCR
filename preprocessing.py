@@ -4,18 +4,17 @@ import numpy as np
 import cv2
 
 
-def find_words(image):
+def detect_text(image):
     """
-    Find and outline words in the given image
+    Detect text in the given image
 
     :param image: numpy array
-    :return: None
+    :return: array of text areas as [y, y + h, x, x + w] in the image
     """
+    text_areas = []
+
     # downsample
     small = cv2.pyrDown(image)
-
-    # add color to an image to make ROI (region of interest) areas green
-    image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
 
     # morphological gradient
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
@@ -40,14 +39,35 @@ def find_words(image):
         cv2.drawContours(mask, contours, index, (255, 255, 255), -1)
 
         # calculate a ratio of non-zero pixels in the filled region
-        ratio = cv2.countNonZero(mask_roi) / w * h
-        print(ratio)
+        ratio = cv2.countNonZero(mask_roi) / (w * h)
 
-        if ratio > .45 and h > 8 and w > 8:
+        if ratio > 0.45 and h > 8 and w > 8:
             # don't forget to upsample the rectangle
-            cv2.rectangle(image, (2 * x, 2 * y), (2 * (x + w), 2 * (y + h)), (0, 255, 0), 1)
+            text_areas.append([2 * y, 2 * (y + h), 2 * x, 2 * (x + w)])
 
-    return image
+    return text_areas
+
+
+def detect_words(image):
+    """
+    Detect words in the given image
+
+    :param image: numpy array
+    :return:
+    """
+    # binary threshold
+    _, binary = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+    # use MSER (maximally stable extremal region) for feature detection
+    mser = cv2.MSER_create()
+    regions, _ = mser.detectRegions(binary)
+    hulls = [cv2.convexHull(p.reshape(-1, 1, 2)) for p in regions]
+
+    # add color to the image to make ROI (region of interest) areas green
+    binary = cv2.cvtColor(binary, cv2.COLOR_GRAY2BGR)
+    cv2.polylines(binary, hulls, 1, (0, 255, 0), 1)
+
+    return binary
 
 
 def mark_points(event, x, y, *_):
@@ -82,75 +102,25 @@ def mark_points(event, x, y, *_):
                 kernel = cv2.getPerspectiveTransform(np.float32(points), np.float32(new_points))
                 new_image = cv2.warpPerspective(test_image, kernel, (new_width, new_height))
 
-                # find words
-                new_image = find_words(new_image)
+                # find text in the image
+                text_areas = detect_text(new_image)
 
-                # histogram equalization
-                # new_image = cv2.equalizeHist(new_image)
-
-                # contrast limited adaptive histogram equalization
-                # clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-                # new_image = clahe.apply(new_image)
-
-                # binary threshold
-                # thresh, new_image = cv2.threshold(new_image, 127, 255, cv2.THRESH_BINARY)
-
-                # Otsu's threshold
-                # thresh, new_image = cv2.threshold(new_image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-
-                # morphological opening
-                # kernel = np.ones((13, 13), np.uint8)
-                # shapes = cv2.morphologyEx(new_image, cv2.MORPH_OPEN, kernel)
-
-                # sharpen image
-                # kernel = np.array([
-                #     [-1, -1, -1, -1, -1],
-                #     [-1, 2, 2, 2, -1],
-                #     [-1, 2, 8, 2, -1],
-                #     [-1, 2, 2, 2, -1],
-                #     [-1, -1, -1, -1, -1]
-                # ]) / 8.0
-                # new_image = cv2.filter2D(new_image, -1, kernel)
-
-                # apply automatic Canny edge detection using the computed median
-                # sigma = 0.33
-                # v = np.median(new_image)
-                # lower = int(max(0, (1.0 - sigma) * v))
-                # upper = int(min(255, (1.0 + sigma) * v))
-                # new_image = cv2.Canny(new_image, lower, upper)
-
-                # find contours
-                # shapes, contours, hierarchy = cv2.findContours(shapes, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+                # add color to the image to make ROI (region of interest) areas green
                 # new_image = cv2.cvtColor(new_image, cv2.COLOR_GRAY2BGR)
 
-                # find the largest contour
-                # if len(contours) > 0:
-                #     largest_area_contour = sorted(contours, key=cv2.contourArea)[-1]
-                #     for index, contour in enumerate(contours):
-                #         # don't show the largest contour
-                #         if not np.array_equal(contour, largest_area_contour):
-                #             x, y, w, h = cv2.boundingRect(contour)
-                #             paragraph = new_image[y:y + h, x:x + w]
-                #             # sharpening
-                #             kernel = np.array([
-                #                 [-1, -1, -1, -1, -1],
-                #                 [-1, 2, 2, 2, -1],
-                #                 [-1, 2, 8, 2, -1],
-                #                 [-1, 2, 2, 2, -1],
-                #                 [-1, -1, -1, -1, -1]
-                #             ]) / 8.0
-                #             paragraph = cv2.filter2D(paragraph, -1, kernel)
-                #             cv2.imshow('letter_{0}.jpg'.format(index), paragraph)
-                #             cv2.rectangle(new_image, (x, y), (x + w, y + h), (0, 255, 0), 1)
+                for index, area in enumerate(text_areas):
+                    cv2.imshow('text_{0}'.format(index), detect_words(new_image[area[0]: area[1], area[2]: area[3]]))
+                    # area format: [y, y + h, x, x + w]
+                    # cv2.rectangle(new_image, (area[2], area[0]), (area[3], area[1]), (0, 255, 0), 1)
 
-                while True:
-                    # show an image
-                    cv2.namedWindow('Output')
-                    cv2.imshow('Output', new_image)
-                    # exit on Esc
-                    if cv2.waitKey(20) & 0xFF == 27:
-                        cv2.destroyWindow('Output')
-                        break
+                # while True:
+                #     # show an image
+                #     cv2.namedWindow('Output')
+                #     cv2.imshow('Output', new_image)
+                #     # exit on Esc
+                #     if cv2.waitKey(20) & 0xFF == 27:
+                #         cv2.destroyWindow('Output')
+                #         break
 
 
 # read an image
