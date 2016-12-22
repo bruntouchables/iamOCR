@@ -41,33 +41,11 @@ def detect_text(image):
         # calculate a ratio of non-zero pixels in the filled region
         ratio = cv2.countNonZero(mask_roi) / (w * h)
 
-        if ratio > 0.45 and h > 8 and w > 8:
+        if ratio > 0.5 and h > 8 and w > 8:
             # don't forget to upsample the rectangle
             text_areas.append([2 * y, 2 * (y + h), 2 * x, 2 * (x + w)])
 
     return text_areas
-
-
-def detect_words(image):
-    """
-    Detect words in the given image
-
-    :param image: numpy array
-    :return:
-    """
-    # binary threshold
-    _, binary = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-
-    # use MSER (maximally stable extremal region) for feature detection
-    mser = cv2.MSER_create()
-    regions, _ = mser.detectRegions(binary)
-    hulls = [cv2.convexHull(p.reshape(-1, 1, 2)) for p in regions]
-
-    # add color to the image to make ROI (region of interest) areas green
-    binary = cv2.cvtColor(binary, cv2.COLOR_GRAY2BGR)
-    cv2.polylines(binary, hulls, 1, (0, 255, 0), 1)
-
-    return binary
 
 
 def mark_points(event, x, y, *_):
@@ -106,25 +84,24 @@ def mark_points(event, x, y, *_):
                 text_areas = detect_text(new_image)
 
                 # add color to the image to make ROI (region of interest) areas green
-                # new_image = cv2.cvtColor(new_image, cv2.COLOR_GRAY2BGR)
+                new_image = cv2.cvtColor(new_image, cv2.COLOR_GRAY2BGR)
 
                 for index, area in enumerate(text_areas):
-                    cv2.imshow('text_{0}'.format(index), detect_words(new_image[area[0]: area[1], area[2]: area[3]]))
                     # area format: [y, y + h, x, x + w]
-                    # cv2.rectangle(new_image, (area[2], area[0]), (area[3], area[1]), (0, 255, 0), 1)
+                    cv2.rectangle(new_image, (area[2], area[0]), (area[3], area[1]), (0, 255, 0), 1)
 
-                # while True:
-                #     # show an image
-                #     cv2.namedWindow('Output')
-                #     cv2.imshow('Output', new_image)
-                #     # exit on Esc
-                #     if cv2.waitKey(20) & 0xFF == 27:
-                #         cv2.destroyWindow('Output')
-                #         break
+                while True:
+                    # show an image
+                    cv2.namedWindow('Output')
+                    cv2.imshow('Output', new_image)
+                    # exit on Esc
+                    if cv2.waitKey(20) & 0xFF == 27:
+                        cv2.destroyWindow('Output')
+                        break
 
 
 # read an image
-test_image = cv2.imread('test.jpg', 0)
+test_image = cv2.imread('test_1.jpg', 0)
 
 # keep marked points
 points = []
