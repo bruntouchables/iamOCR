@@ -1,2 +1,2 @@
 # iamOCR
-Currently under development
+_Under Development_
